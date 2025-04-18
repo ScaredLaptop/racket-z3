@@ -21,7 +21,7 @@ All exposed bindings to the Z3 C‑API are auto‑generated into Racket FFI stub
 # Requires Racket ≥8.10 and Z3 shared library on PATH
 ```console
 export Z3_LIB_PATH="/opt/homebrew/lib/libz3.dylib"
-git clone https://github.com/<you>/racket-z3 && cd racket-z3
+git clone https://github.com/ScaredLaptop/racket-z3.git && cd racket-z3
 raco pkg install --auto  
 raco test racket-z3-test/smoke-ffi.rkt
 ```
