@@ -117,7 +117,7 @@ def emit_functions(funcs, path: Path):
             args = " ".join(rkt_type(t) for t, _ in params)
             rng  = rkt_type(ret)
             sig  = f"(_fun {args} -> {rng})" if args else f"(_fun -> {rng})"
-            fp.write(f"(define-z3 {name} {sig})\n")
+            fp.write(f"(define-z3 _{name} {sig} #:c-id {name})\n")
         fp.write("\n(provide (all-defined-out))\n")
 
 def generate(out_dir: Path):

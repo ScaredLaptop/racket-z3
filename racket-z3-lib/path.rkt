@@ -23,5 +23,5 @@
       [else lib-name])))
 
 (define lib (ffi-lib lib-path #:fail (λ () (error "Cannot load Z3 native lib" lib-path))))
-(define-ffi-definer define-z3 lib)
+(define-ffi-definer define-z3 lib #:default-make-fail make-not-available)
 (provide define-z3)
