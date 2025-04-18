@@ -12,6 +12,8 @@ HEADER_URLS = [
     "https://raw.githubusercontent.com/Z3Prover/z3/master/src/api/z3_api.h",
     "https://raw.githubusercontent.com/Z3Prover/z3/"
     "f63c9e366fad52638dc5c413fa6262c238468d26/src/api/z3_optimization.h",
+    "https://raw.githubusercontent.com/Z3Prover/z3/e31e9819b1796ddbcd71d43230a91743b6df7d75/src/api/z3_ast_containers.h",
+    
 ]
 
 
