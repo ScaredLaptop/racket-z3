@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Generate Racket FFI bindings (functions.rkt, enums.rkt, types.rkt)
-from z3_api.h and z3_optimization.h.
+for Z3.  Covers z3_api.h, z3_optimization.h, z3_ast_containers.h,
+and z3_fixedpoint.h.
 """
 from __future__ import annotations
 import re, sys
@@ -13,10 +14,10 @@ HEADER_URLS = [
     "https://raw.githubusercontent.com/Z3Prover/z3/"
     "f63c9e366fad52638dc5c413fa6262c238468d26/src/api/z3_optimization.h",
     "https://raw.githubusercontent.com/Z3Prover/z3/e31e9819b1796ddbcd71d43230a91743b6df7d75/src/api/z3_ast_containers.h",
-    
+    "https://raw.githubusercontent.com/Z3Prover/z3/master/src/api/z3_fixedpoint.h",
 ]
 
-
+# ──────────────────────────────────────────────────────────────────────────────
 C_TO_RKT = {
     "void": "_void", "bool": "_bool", "Z3_bool": "_bool",
     "int": "_int", "unsigned": "_uint", "unsigned int": "_uint",
@@ -33,35 +34,56 @@ FUNC_PATTERNS = [
     re.compile(r"Z3_API\s+([A-Za-z0-9_ *]+?)\s+(Z3_[A-Za-z0-9_]+)\s*\(([^)]*)\)\s*;"),
     re.compile(r"([A-Za-z0-9_ *]+?)\s+Z3_API\s+(Z3_[A-Za-z0-9_]+)\s*\(([^)]*)\)\s*;"),
 ]
-DEFINE_TYPE_RE  = re.compile(r"DEFINE_TYPE\(\s*(Z3_[A-Za-z0-9_]+)\s*\)")
-TYPEDEF_PTR_RE  = re.compile(r"typedef\s+struct\s+_[A-Za-z0-9_]+\s*\*\s*(Z3_[A-Za-z0-9_]+)\s*;")
-ENUM_RE         = re.compile(r"typedef\s+enum\s*\{([^}]+?)\}\s*(Z3_[A-Za-z0-9_]+)\s*;", re.S)
+DEFINE_TYPE_RE = re.compile(r"DEFINE_TYPE\(\s*(Z3_[A-Za-z0-9_]+)\s*\)")
+TYPEDEF_PTR_RE = re.compile(r"typedef\s+struct\s+_[A-Za-z0-9_]+\s*\*\s*(Z3_[A-Za-z0-9_]+)\s*;")
+ENUM_RE        = re.compile(r"typedef\s+enum\s*\{([^}]+?)\}\s*(Z3_[A-Za-z0-9_]+)\s*;", re.S)
 
 SKIP_FUNCS = {
     "Z3_is_recursive_datatype_sort",
     "Z3_get_array_arity",
 }
 
-def download(url):                    
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp.text
+# ──────────────────────────────────────────────────────────────────────────────
+def download(url: str) -> str:
+    r = requests.get(url, timeout=30)
+    r.raise_for_status()
+    return r.text
 
-def get_full_header():
+def get_full_header() -> str:
     return "\n\n".join(download(u) for u in HEADER_URLS)
+
+# NEW — robust split that keeps array names and converts “[]” → “*”
+ARRAY_RE = re.compile(r"\[\s*]$")
 
 def split_params(blob: str):
     blob = blob.strip()
     if not blob or blob == "void":
         return []
-    out = []
-    for p in blob.split(","):
-        *type_tokens, name = p.replace("[]", " *").split()
-        ctype = " ".join(type_tokens).replace("const ", "")
-        if name.startswith("*"):
+    out: list[tuple[str, str]] = []
+    for p in map(str.strip, blob.split(",")):
+        # Handle anonymous parameters (mostly in callback typedefs)
+        if p in {"...", ""}:
+            out.append(("_pointer", ""))
+            continue
+
+        # Convert trailing [] to * for FFI; remember we did it so we don’t drop the name
+        is_array = ARRAY_RE.search(p) is not None
+        p = ARRAY_RE.sub("", p)
+
+        # Pull name off the rightmost token
+        *type_tokens, name = p.split()
+        ctype = " ".join(type_tokens)
+
+        if is_array:
+            ctype += " *"
+
+        # Leading * on the name → part of the type
+        while name.startswith("*"):
             ctype += " *"
             name = name.lstrip("*")
-        out.append((ctype.strip(), name.strip()))
+
+        ctype = ctype.replace("const ", "").strip()
+        out.append((ctype, name))
     return out
 
 def split_enum_items(body: str):
